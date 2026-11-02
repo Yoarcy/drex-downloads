@@ -1,0 +1,22 @@
+# Runtime and private state
+/data/
+/Descargas/
+/backups/
+**/.drex-partials/
+/network/snapshot.json
+/network/lease.json
+/network/enabled.flag
+/network/status.txt
+/network/error.txt
+show.request
+*.lnk
+*.bak
+# Build and test outputs
+*.exe
+*.zip
+*.pdb
+/tests/run-*/
+/tests/installer-*/
+/tests/latest-report.json
+/dist/
+.env*

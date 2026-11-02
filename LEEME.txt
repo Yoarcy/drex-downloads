@@ -1,0 +1,68 @@
+DREX DOWNLOADS 1.0.5 — Gestor local de descargas para Windows
+========================================================
+
+ABRIR
+Doble clic en DrexDownloads.exe o en el acceso del escritorio.
+No requiere instalar Python, aria2, WanGP ni OpenClaw.
+
+DESCARGAR
+1. Pulsa «Nueva descarga».
+2. Pega el enlace directo HTTP/HTTPS. Puedes pegar una lista, un enlace por línea.
+3. Elige la carpeta. Por defecto se usa la carpeta Descargas junto al programa.
+4. Opcional: nombre, SHA-256 esperado, token de Hugging Face, conexiones y velocidad.
+5. Pulsa «Añadir descarga».
+
+COLA Y SEGUNDO PLANO
+Se procesa un archivo de la cola a la vez, con hasta cuatro conexiones por archivo.
+Cerrar la ventana mantiene el programa en la bandeja del sistema.
+Para cerrarlo realmente: Más > Salir y conservar progreso, o menú de la bandeja.
+Para abrir la ventana otra vez: doble clic en el acceso o en el icono de bandeja.
+Inicio automático opcional: menú del icono de bandeja > Iniciar con Windows.
+Después de abrir el programa se recuperan las tareas activas; las pausadas por ti siguen pausadas.
+
+PROTECCIÓN DEL PROGRESO
+Los datos recibidos se confirman cada 5 segundos o 4 MiB por conexión, lo que ocurra primero.
+Primero se sincronizan los datos con el disco; después se escriben dos registros independientes.
+Al recuperar se comprueban las huellas de los bloques guardados. Las partes buenas se reutilizan.
+Si una parte está dañada, se vuelve a pedir esa parte cuando el servidor admite rangos.
+El intervalo es un objetivo operativo, no una garantía de pérdida máxima ante fallos de hardware.
+No borres la carpeta .drex-partials que aparece en el destino de tus descargas.
+No borres la carpeta data del programa: contiene el historial y los metadatos de recuperación.
+No muevas el programa ni los parciales mientras esté abierto.
+Un apagón físico puede dañar el almacenamiento; ningún programa ofrece protección absoluta.
+
+ENLACE CADUCADO
+Pausa la descarga y espera a que deje de estar activa.
+Selecciona «Renovar enlace» y pega la nueva dirección del mismo archivo.
+Se comprueba tamaño e identidad. No se sobrescribe el progreso cuando no es seguro continuar.
+En Hugging Face, el programa intenta fijar la revisión a su commit cuando el servidor lo informa.
+Los tokens opcionales se protegen con el cifrado del usuario actual de Windows y solo se envían
+inicialmente a https://huggingface.co. No copies tokens en capturas ni en nombres de archivo.
+
+VERIFICACIÓN
+Si proporcionas SHA-256 esperado se compara antes de publicar el archivo.
+Si no lo proporcionas, se calcula una huella, pero eso no prueba igualdad con el original.
+Un hash incorrecto detiene la tarea y conserva el parcial. No fuerza una descarga desde cero.
+Puedes corregir la referencia con Más > Cambiar SHA-256 esperado y luego Continuar.
+«Retirar de la lista» NO borra datos. Se conservan también los parciales retirados.
+
+LÍMITES DE ESTA VERSIÓN
+- Archivos directos HTTP/HTTPS con tamaño conocido; no descarga páginas de vídeo ni enlaces blob:.
+- No captura automáticamente el navegador ni interfiere con audios de WanGP.
+- Sin servidor compatible con rangos no es posible reanudar una transferencia interrumpida.
+- Para reanudar exige ETag fuerte coincidente o SHA-256 esperado. Si falta identidad, se detiene.
+- Un SHA-256 esperado permite comprobar al final, no garantiza que todo servidor acepte reanudar.
+- No importa archivos temporales privados de IDM.
+- Sin extensión del navegador, calendario de descargas ni integración de cookies en esta versión.
+- Rutas completas limitadas a 240 caracteres; elige una carpeta corta para archivos con nombres largos.
+- No hay comparación de velocidad con IDM ni certificación frente a apagón eléctrico real.
+
+ARCHIVOS
+DrexDownloads.exe : aplicación operativa.
+src              : código fuente y script de compilación reproducible.
+tests            : pruebas y resultados de la versión.
+docs             : decisiones técnicas y resultados de entrega.
+data             : historial y configuración de tareas (no borrar).
+Descargas        : destino predeterminado.
+
+No hay suscripción ni llamadas a servicios de IA durante las descargas.
