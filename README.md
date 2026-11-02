@@ -6,7 +6,7 @@
 
 Proyecto de [Yoarcy](https://github.com/Yoarcy). Desarrollado en C# / Windows Forms con motor HTTP propio sobre .NET Framework. No depende de IDM, aria2, OpenClaw ni servicios de IA para descargar.
 
-[Descargar versión 1.0.6](https://github.com/Yoarcy/drex-downloads/releases/tag/v1.0.6) · [Manual](LEEME.txt) · [Arquitectura](docs/ARQUITECTURA.md) · [Compilación](docs/BUILD.md)
+[Descargar versión 1.0.7](https://github.com/Yoarcy/drex-downloads/releases/tag/v1.0.7) · [Manual](LEEME.txt) · [Arquitectura](docs/ARQUITECTURA.md) · [Compilación](docs/BUILD.md)
 
 ![Interfaz de Drex Downloads](docs/interfaz.png)
 
@@ -17,7 +17,8 @@ Proyecto de [Yoarcy](https://github.com/Yoarcy). Desarrollado en C# / Windows Fo
 - Guardado incremental con doble diario y comprobación SHA-256 por bloques.
 - Recuperación de bloques válidos tras interrupciones; los parciales no se eliminan por un error.
 - SHA-256 esperado opcional, límites de velocidad y soporte de enlaces de Hugging Face.
-- Bandeja del sistema e inicio con Windows opcional.
+- Bandeja del sistema y arranque condicional: solo recupera tras reinicio si quedó una descarga activa interrumpida.
+- Renovación automática desde el enlace de origen cuando sea renovable; espera de red con reintentos locales.
 - Interfaz oscura texturada e icono propio en ventana, ejecutable, bandeja e instalador.
 - Modo **Internet exclusivo**, componente opcional y experimental de control de salida de Windows.
 
@@ -25,7 +26,7 @@ Proyecto de [Yoarcy](https://github.com/Yoarcy). Desarrollado en C# / Windows Fo
 
 Windows de escritorio con **.NET Framework 4.8**. Compilación AnyCPU; la ruta de compilación incluida usa el compilador de Windows de 64 bits. No se ha validado una matriz completa de versiones de Windows.
 
-1. Descarga `DrexDownloads-Setup-1.0.6.exe` desde Releases.
+1. Descarga `DrexDownloads-Setup-1.0.7.exe` desde Releases.
 2. Ejecuta el instalador y elige una **carpeta vacía** con permisos de escritura.
 3. Abre `DrexDownloads.exe`. El instalador no inicia descargas ni cambia el firewall.
 
@@ -45,11 +46,16 @@ Reanudar requiere soporte de rangos y validación de identidad/tamaño. No desca
 
 ## Estado de las pruebas
 
-- 31 comprobaciones históricas del motor: [resultado](docs/test-results-historical.json).
-- En 1.0.6: compilación, interfaz, extracción del instalador e igualdad SHA-256 del ejecutable comprobadas; motor sin cambios respecto al respaldo anterior.
-- La suite completa no se volvió a ejecutar para este cambio visual.
-- La instalación física en una segunda PC sigue pendiente de validación.
-- Cinco casos simulados de portabilidad aprobados. LAN/RDP/SMB, bloqueo de Internet y restauración comprobados en el equipo de desarrollo.
+- **41/41 pruebas locales aprobadas en 1.0.7**: motor, recuperación, identidad, pausas, arranque condicional, renovación de enlaces y espera de red.
+- Compilación, interfaz, extracción del instalador y supervisor incrustado verificados.
+- Cinco casos de portabilidad de red y pruebas reales LAN/RDP/SMB, bloqueo HTTPS y restauración aprobados en 1.0.6.
+- No se realizó un apagón físico. El arranque condicional se prueba con metadatos y cambios simulados de arranque.
+
+## Recuperación autónoma
+
+Al descargar se prepara una entrada de inicio del usuario. Tras un nuevo arranque, al iniciar sesión en Windows, solo abre y reanuda si quedó una tarea activa interrumpida. No se activa por tareas pausadas, terminadas ni después de **Salir y conservar progreso**. Cerrar con X mantiene la descarga en la bandeja; no equivale a salir. No necesita agente ni créditos de IA.
+
+Un enlace estable de origen se vuelve a solicitar y sus redirecciones se resuelven de nuevo. Se evitan respuestas de caché y se limita la renovación tras denegaciones de acceso. No se puede inventar un enlace nuevo si solo se dispone de una URL firmada caducada, ni superar una cuenta sin permisos, CAPTCHA o autenticación expirada. Se conserva el parcial y se informa el bloqueo. La identidad/tamaño/hash siguen validándose antes de reutilizar los bloques.
 
 ## Estructura
 

@@ -1,4 +1,4 @@
-DREX DOWNLOADS 1.0.6 — Gestor local de descargas para Windows
+DREX DOWNLOADS 1.0.7 — Gestor local de descargas para Windows
 ========================================================
 
 ABRIR
@@ -17,7 +17,7 @@ Se procesa un archivo de la cola a la vez, con hasta cuatro conexiones por archi
 Cerrar la ventana mantiene el programa en la bandeja del sistema.
 Para cerrarlo realmente: Más > Salir y conservar progreso, o menú de la bandeja.
 Para abrir la ventana otra vez: doble clic en el acceso o en el icono de bandeja.
-Inicio automático opcional: menú del icono de bandeja > Iniciar con Windows.
+Recuperación tras reinicio: automática solo si estaba descargando. Se ejecuta al iniciar sesión en Windows. Salir normalmente desarma ese inicio; pausar o terminar no provoca una apertura posterior.
 Después de abrir el programa se recuperan las tareas activas; las pausadas por ti siguen pausadas.
 
 PROTECCIÓN DEL PROGRESO
@@ -69,3 +69,6 @@ No hay suscripción ni llamadas a servicios de IA durante las descargas.
 
 INTERNET EXCLUSIVO INTEGRADO
 Marca la casilla y acepta, si Windows lo solicita, el permiso de administrador. No requiere instalar scripts ni componentes aparte. La LAN permanece permitida. La app prepara automáticamente la recuperación tras reinicio. Consulta docs/NETWORK.md.
+
+RENOVACIÓN AUTÓNOMA
+Se reintenta desde el enlace de origen estable sin IA y conservando la identidad del archivo. Una URL firmada caducada sin origen, permisos faltantes o CAPTCHA no se pueden renovar sin datos adicionales.

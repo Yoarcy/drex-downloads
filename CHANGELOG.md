@@ -1,5 +1,10 @@
 # Cambios
 
+## 1.0.7
+- Inicio condicional del usuario tras interrupción durante descargas; pausas, cierre normal y finalización respetados.
+- Renovación local desde enlace de origen, denegaciones acotadas y espera de red persistente.
+- 41 pruebas aprobadas; metadatos y bloques conservados.
+
 ## 1.0.6
 - La LAN queda fuera de la restricción de Internet: RDP, SMB, redes privadas y descubrimiento local.
 - Supervisor incrustado en el ejecutable, activación elevada desde la app y recuperación al inicio preparada automáticamente.

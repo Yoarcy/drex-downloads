@@ -8,6 +8,8 @@ HASH=hashlib.sha256(DATA).hexdigest()
 requests=[]
 flaky_sent=False
 busy_sent=False
+refresh_sent=False
+offline_count=0
 class Handler(http.server.BaseHTTPRequestHandler):
  protocol_version='HTTP/1.1'
  def log_message(self,*a):pass
@@ -25,6 +27,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
     while left:n=min(left,len(chunk));self.wfile.write(chunk[:n]);self.wfile.flush();left-=n
    except (BrokenPipeError,ConnectionResetError,ConnectionAbortedError):pass
    return
+  global refresh_sent,offline_count
+  if path=='/refresh' and not refresh_sent and not self.headers.get('Range','').startswith('bytes=0-'):
+   refresh_sent=True;self.send_response(403);self.send_header('Content-Length','0');self.end_headers();return
+  if path=='/offlineboot' and offline_count<5:
+   offline_count+=1;self.send_response(503);self.send_header('Retry-After','0');self.send_header('Content-Length','0');self.end_headers();return
   global busy_sent
   if path=='/busy' and not busy_sent:
    busy_sent=True;self.send_response(429);self.send_header('Retry-After','2');self.send_header('Content-Length','0');self.end_headers();return
@@ -113,7 +120,7 @@ def main():
  with part.open('r+b') as f:f.seek(64);f.write(b'DAMAGED')
  req_before=len(requests);rc,d=run('bad_hash');new_requests=requests[req_before:];transferred=sum(x[3] for x in new_requests)
  result('selective_repair_keeps_healthy_block',rc==0 and d['ActualHash']==HASH and transferred<len(DATA),f'rerequested={transferred} of {len(DATA)}')
- check=subprocess.run([str(ROOT/'tests'/'EngineChecks.exe'),str(WORK/'enginechecks'),BASE,HASH],capture_output=True,text=True,timeout=100)
+ check=subprocess.run([str(ROOT/'tests'/'EngineChecks.exe'),str(WORK/'enginechecks'),BASE,HASH],capture_output=True,text=True,timeout=240)
  for line in check.stdout.splitlines():
   if line.startswith(('PASS ','FAIL ')):result(line[5:],line.startswith('PASS '))
  result('engine_lifecycle_suite_exit',check.returncode==0,check.stderr[:200])

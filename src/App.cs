@@ -17,6 +17,7 @@ static class Program {
  [STAThread] static int Main(string[] args){
   if(args.Length>0&&args[0]=="--network-guard")return NetworkControl.Run();
   if(args.Length==2&&args[0]=="--network-recover")return NetworkControl.Run(Encoding.UTF8.GetString(Convert.FromBase64String(args[1])));
+  if(args.Length>0&&args[0]=="--recover-after-restart"&&!RestartControl.ShouldRecover(AppDomain.CurrentDomain.BaseDirectory,RestartControl.BootUtc))return 0;
   Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
   if(args.Length>0&&args[0]=="--test-download")return TestDownload(args);
   if(args.Length>0&&args[0]=="--verify-state")return Verify(args);
@@ -94,10 +95,12 @@ public class MainForm:Form {
   grid.CellDoubleClick+=(s,e)=>Details();grid.SelectionChanged+=(s,e)=>UpdateDetail();Controls.Add(grid);grid.BringToFront();
   var menu=new ContextMenuStrip();menu.Items.Add("Abrir Drex Downloads",null,(s,e)=>Restore());menu.Items.Add("Nueva descarga",null,(s,e)=>{Restore();AddDownload();});menu.Items.Add("Salir y conservar progreso",null,(s,e)=>Exit());
   tray=new NotifyIcon{Icon=Icon,Text="Drex Downloads",Visible=true,ContextMenuStrip=menu};tray.DoubleClick+=(s,e)=>Restore();
-  var options=new ToolStripMenuItem("Iniciar con Windows"){Checked=File.Exists(StartupFile),CheckOnClick=true};options.Click+=(s,e)=>SetStartup(options.Checked);menu.Items.Insert(2,options);
-  timer=new System.Windows.Forms.Timer{Interval=1000};timer.Tick+=(s,e)=>{RefreshGrid();NetworkLease();string request=Path.Combine(root,"show.request");if(File.Exists(request)){try{File.Delete(request);}catch{}Restore();}};timer.Start();
+  var options=new ToolStripMenuItem("Recuperación tras reinicio: automática solo si descargaba"){Enabled=false};menu.Items.Insert(2,options);
+  if(File.Exists(StartupFile)&&File.ReadAllText(StartupFile).Contains(Application.ExecutablePath)){File.Move(StartupFile,StartupFile+".disabled-"+DateTime.UtcNow.Ticks);}
+
+  timer=new System.Windows.Forms.Timer{Interval=1000};timer.Tick+=(s,e)=>{RefreshGrid();NetworkLease();UpdateRestart();string request=Path.Combine(root,"show.request");if(File.Exists(request)){try{File.Delete(request);}catch{}Restore();}};timer.Start();
   Shown+=(s,e)=>{RefreshGrid();if(exclusive.Checked || File.Exists(Path.Combine(root,"network","snapshot.json"))){try{NetworkLease();NetworkControl.Ensure();}catch(Exception ex){exclusive.Checked=false;MessageBox.Show(ex.Message);}}if(!string.IsNullOrEmpty(engine.StartupWarning))MessageBox.Show(this,engine.StartupWarning,"Recuperación");};
-  FormClosing+=(s,e)=>{if(!exiting&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();tray.ShowBalloonTip(2500,"Drex Downloads","Sigo descargando en segundo plano. Puedes abrirme desde la bandeja.",ToolTipIcon.Info);}else{timer.Stop();NetworkLease(true);engine.Dispose();tray.Visible=false;tray.Dispose();}};
+  FormClosing+=(s,e)=>{if(!exiting&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();tray.ShowBalloonTip(2500,"Drex Downloads","Sigo descargando en segundo plano. Puedes abrirme desde la bandeja.",ToolTipIcon.Info);}else{timer.Stop();if(e.CloseReason!=CloseReason.WindowsShutDown)RestartControl.Disarm(root);NetworkLease(true);engine.Dispose();tray.Visible=false;tray.Dispose();}};
   AddTitleBar();
   engine.Start();
  }
@@ -115,6 +118,7 @@ public class MainForm:Form {
   minimize.Click+=(o,e)=>WindowState=FormWindowState.Minimized;close.Click+=(o,e)=>Close();
   caption.Controls.AddRange(new Control[]{mark,name,minimize,close});Controls.Add(caption);
  }
+ void UpdateRestart(){try{RestartControl.Update(root,engine,Application.ExecutablePath);}catch(Exception ex){status.Text="No se pudo preparar la recuperación automática: "+ex.Message;}}
  void NetworkLease(bool stop=false){try{string dir=Path.Combine(root,"network");Directory.CreateDirectory(dir);bool active;lock(engine.Gate)active=engine.Jobs.Any(j=>j.D.Desired&&!j.D.Completed&&!j.D.Removed);Store.Atomic(Path.Combine(dir,"lease.json"),Encoding.UTF8.GetBytes("{\"enabled\":"+(exclusive.Checked&&!stop?"true":"false")+",\"active\":"+(active&&!stop?"true":"false")+"}"));string f=Path.Combine(dir,"status.txt");networkState.Text=File.Exists(f)?File.ReadAllText(f):"Internet normal · LAN libre";if(exclusive.Checked&&File.Exists(f)&&(DateTime.UtcNow-File.GetLastWriteTimeUtc(f)).TotalSeconds>20)networkState.Text="Supervisor sin respuesta";}catch{networkState.Text="Error del control de red";}}
  string StartupFile {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup),"Drex Downloads.vbs");}}
  void SetStartup(bool enable){try{if(enable){string exe=Application.ExecutablePath.Replace("\"","\"\"");File.WriteAllText(StartupFile,"CreateObject(\"WScript.Shell\").Run Chr(34) & \""+exe+"\" & Chr(34), 1, False\r\n");}else if(File.Exists(StartupFile))File.Delete(StartupFile);}catch(Exception ex){MessageBox.Show(ex.Message);}}
@@ -123,7 +127,7 @@ public class MainForm:Form {
  void Exit(){exiting=true;Close();}
  Job Selected(){return grid.SelectedRows.Count>0?grid.SelectedRows[0].Tag as Job:null;}
  void SafeAct(Action<Job> f){try{Act(f);}catch(Exception ex){MessageBox.Show(this,ex.Message,"Drex Downloads");}}
- void Act(Action<Job> f){var j=Selected();if(j==null)throw new NeedAction("Selecciona una descarga.");f(j);RefreshGrid();}
+ void Act(Action<Job> f){var j=Selected();if(j==null)throw new NeedAction("Selecciona una descarga.");f(j);RefreshGrid();UpdateRestart();}
  void AddDownload(){using(var f=new AddForm(root)){if(f.ShowDialog(this)==DialogResult.OK){var urls=f.Urls.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries);int count=0;var failures=new List<string>();foreach(string u in urls){try{engine.Add(u,f.Folder,urls.Length==1?f.FileName:"",urls.Length==1?f.Hash:"",f.Connections,f.Limit,f.Token,f.StartNow);count++;}catch(Exception ex){failures.Add("Línea "+(count+failures.Count+1)+": "+ex.Message);}}RefreshGrid();stats.Text=count+" descarga(s) añadida(s)";if(failures.Count>0)MessageBox.Show(this,count+" añadidas. Revisa:\n"+string.Join("\n",failures),"Añadir descargas");}}}
  void Renew(){Act(j=>{if(j.Working)throw new NeedAction("Pulsa Pausar y espera antes de renovar.");string url=Prompt("Renovar enlace","Pega el enlace nuevo del MISMO archivo. Se comprobará la identidad antes de continuar.","");if(url!=null)engine.Renew(j,url);});}
  async void RemoveSelected(){

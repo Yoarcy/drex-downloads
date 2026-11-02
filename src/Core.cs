@@ -17,7 +17,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace DrexDownloads {
 [DataContract] public class JobData {
- [DataMember] public string Id, Url, Name, Folder, ExpectedHash, ActualHash, ETag, LastModified, PinnedCommit, State, Error, TokenProtected;
+ [DataMember] public string Id, Url, OriginUrl, Name, Folder, ExpectedHash, ActualHash, ETag, LastModified, PinnedCommit, State, Error, TokenProtected;
  [DataMember] public long Size=-1, Saved, Generation, Order;
  [DataMember] public bool Desired=true, Completed=false, Removed=false;
  [DataMember] public int Connections=2, LimitKiB=0;
@@ -35,6 +35,7 @@ namespace DrexDownloads {
  [DataMember] public string Payload,Hash;
 }
 public class RetryLater : WebException { public int Seconds,Code; public RetryLater(int code,int seconds):base("Servidor ocupado"){Code=code;Seconds=seconds;} }
+public class ExpiredLink : Exception { public bool Redirected; public ExpiredLink(bool redirected):base("Enlace caducado o autorización rechazada"){Redirected=redirected;} }
 public class NeedAction : Exception { public NeedAction(string s):base(s){} }
 public static class Store {
  [DllImport("kernel32.dll",SetLastError=true)] static extern bool DeviceIoControl(SafeFileHandle h,uint code,IntPtr input,uint inputLength,IntPtr output,uint outputLength,out uint returned,IntPtr overlapped);
@@ -61,7 +62,8 @@ public class Job {
  public long LastReceiveTicks=DateTime.UtcNow.Ticks;
  public int ActiveCommits;
  public double Speed;
- public int Attempts;
+ public int Attempts, RefreshAttempts;
+ public long RefreshSaved=-1;
  public readonly object Gate=new object();
  public List<Block> Blocks=new List<Block>();
  public Job(JobData d){D=d;}
@@ -103,26 +105,32 @@ public class Engine : IDisposable {
   lock(Gate){
    var duplicate=Jobs.FirstOrDefault(j=>j.D.Url==u.AbsoluteUri&&!j.D.Completed&&!j.D.Removed);if(duplicate!=null)throw new NeedAction("Ese enlace ya está en la lista.");
    string original=name;int n=1;while(File.Exists(Path.Combine(folder,name))||Jobs.Any(j=>j.D.Folder.Equals(folder,StringComparison.OrdinalIgnoreCase)&&j.D.Name.Equals(name,StringComparison.OrdinalIgnoreCase)))name=Path.GetFileNameWithoutExtension(original)+" ("+(n++)+")"+Path.GetExtension(original);
-   var d=new JobData{Id=Guid.NewGuid().ToString("N"),Url=u.AbsoluteUri,Name=name,Folder=folder,ExpectedHash=(hash??"").Trim().ToLowerInvariant(),Connections=Math.Max(1,Math.Min(4,connections)),LimitKiB=Math.Max(0,limit),TokenProtected=Store.Protect(token),State=start?"En cola":"Pausado",Desired=start,Order=DateTime.UtcNow.Ticks};
+   var d=new JobData{Id=Guid.NewGuid().ToString("N"),Url=u.AbsoluteUri,OriginUrl=u.AbsoluteUri,Name=name,Folder=folder,ExpectedHash=(hash??"").Trim().ToLowerInvariant(),Connections=Math.Max(1,Math.Min(4,connections)),LimitKiB=Math.Max(0,limit),TokenProtected=Store.Protect(token),State=start?"En cola":"Pausado",Desired=start,Order=DateTime.UtcNow.Ticks};
    var job=new Job(d);Directory.CreateDirectory(d.Work);Save(job);Save(job);Jobs.Add(job);return job;
   }
  }
  public void Start(){scheduler=new Thread(Schedule){IsBackground=true};scheduler.Start();}
- void Schedule(){while(!Closing){Job job=null;lock(Gate)job=Jobs.FirstOrDefault(j=>j.D.Desired&&!j.D.Completed&&!j.D.Removed&&!j.Working);if(job==null){Thread.Sleep(200);continue;}job.Stop=false;job.Working=true;long savedBefore=job.D.Saved;try{Run(job);}catch(OperationCanceledException){job.D.State=job.D.Desired?"En cola":"Pausado";}catch(NeedAction ex){job.D.Error=ex.Message;job.D.State="Requiere atención";job.D.Desired=false;}catch(WebException ex){job.D.Error=NetworkError(ex);job.D.State="Esperando red";job.Attempts=job.D.Saved>savedBefore?1:job.Attempts+1;if(job.Attempts>=5){job.D.Desired=false;job.D.State="Requiere atención";}else { if(job.D.Desired&&!Closing)job.Stop=false; int delay=Math.Min(30,job.Attempts*3);var busy=ex as RetryLater;if(busy!=null)delay=Math.Max(delay,busy.Seconds);for(int i=0;i<delay*10&&!job.Stop&&!Closing;i++)Thread.Sleep(100); }}catch(IOException){job.D.Error="No se pudo leer o escribir. Revisa espacio, unidad y permisos. Tus parciales se conservan.";job.D.Desired=false;job.D.State="Requiere atención";}catch(Exception){job.D.Error="La tarea se detuvo de forma segura. Los parciales se conservan; prueba Continuar.";job.D.Desired=false;job.D.State="Requiere atención";}finally{job.Speed=0;job.Working=false;try{Save(job);Record(job);}catch{} }} }
+ void Schedule(){while(!Closing){Job job=null;lock(Gate)job=Jobs.FirstOrDefault(j=>j.D.Desired&&!j.D.Completed&&!j.D.Removed&&!j.Working);if(job==null){Thread.Sleep(200);continue;}job.Stop=false;job.Working=true;long savedBefore=job.D.Saved;try{Run(job);}catch(OperationCanceledException){job.D.State=job.D.Desired?"En cola":"Pausado";}catch(ExpiredLink){
+ if(job.D.Saved>job.RefreshSaved){job.RefreshAttempts=0;job.RefreshSaved=job.D.Saved;}
+ Uri origin;string source=string.IsNullOrEmpty(job.D.OriginUrl)?job.D.Url:job.D.OriginUrl;
+ bool stable=Uri.TryCreate(source,UriKind.Absolute,out origin)&&!Regex.IsMatch(origin.Query,@"(?i)(X-Amz-Signature|Signature|Expires|token)=");
+ if(stable&&++job.RefreshAttempts<=3){job.D.Url=source;job.D.Error="";job.D.State="Renovando enlace automáticamente";job.Stop=false;Thread.Sleep(1000);}
+ else{job.D.Error="No se pudo renovar el acceso automáticamente. Falta un enlace de origen válido o autorización. Los parciales se conservan.";job.D.State="Requiere atención";job.D.Desired=false;}
+ }catch(NeedAction ex){job.D.Error=ex.Message;job.D.State="Requiere atención";job.D.Desired=false;}catch(WebException ex){job.D.Error=NetworkError(ex);job.D.State="Esperando red";job.Attempts=job.D.Saved>savedBefore?1:job.Attempts+1;{job.Attempts=Math.Min(job.Attempts,20); if(job.D.Desired&&!Closing)job.Stop=false; int delay=Math.Min(60,job.Attempts*3);var busy=ex as RetryLater;if(busy!=null)delay=Math.Max(delay,busy.Seconds);for(int i=0;i<delay*10&&!job.Stop&&!Closing;i++)Thread.Sleep(100); }}catch(IOException){job.D.Error="No se pudo leer o escribir. Revisa espacio, unidad y permisos. Tus parciales se conservan.";job.D.Desired=false;job.D.State="Requiere atención";}catch(Exception){job.D.Error="La tarea se detuvo de forma segura. Los parciales se conservan; prueba Continuar.";job.D.Desired=false;job.D.State="Requiere atención";}finally{job.Speed=0;job.Working=false;try{Save(job);Record(job);}catch{} }} }
  string NetworkError(WebException ex){var busy=ex as RetryLater;if(busy!=null)return "El servidor pidió esperar (HTTP "+busy.Code+"). Se respetará el intervalo indicado.";var r=ex.Response as HttpWebResponse;if(r!=null){int code=(int)r.StatusCode;r.Close();return "El servidor respondió HTTP "+code+". Revisa el enlace o la autorización.";}return "La conexión se interrumpió. Reintento automático conservando el avance.";}
  public void Pause(Job j){j.D.Desired=false;j.Stop=true;j.D.State=j.Working?"Pausando":"Pausado";Save(j);}
  public void Resume(Job j){if(j.Working)throw new NeedAction("Espera a que termine de pausar.");if(j.D.Completed)return;j.Stop=false;j.Attempts=0;j.D.Error="";j.D.State="En cola";j.D.Desired=true;Save(j);}
- public void Renew(Job j,string url){if(j.Working)throw new NeedAction("Pausa la tarea antes de renovar el enlace.");Uri u;if(!Uri.TryCreate(url.Trim(),UriKind.Absolute,out u)||(u.Scheme!="http"&&u.Scheme!="https")||!string.IsNullOrEmpty(u.UserInfo))throw new NeedAction("Enlace HTTP/HTTPS inválido.");j.D.Url=u.AbsoluteUri;j.D.Error="";Save(j);Resume(j);}
+ public void Renew(Job j,string url){if(j.Working)throw new NeedAction("Pausa la tarea antes de renovar el enlace.");Uri u;if(!Uri.TryCreate(url.Trim(),UriKind.Absolute,out u)||(u.Scheme!="http"&&u.Scheme!="https")||!string.IsNullOrEmpty(u.UserInfo))throw new NeedAction("Enlace HTTP/HTTPS inválido.");j.D.Url=u.AbsoluteUri;j.D.OriginUrl=u.AbsoluteUri;j.RefreshAttempts=0;j.D.Error="";Save(j);Resume(j);}
  public void Move(Job j,int direction){lock(Gate){int i=Jobs.IndexOf(j),n=i+direction;if(n<0||n>=Jobs.Count)return;Jobs.RemoveAt(i);Jobs.Insert(n,j);for(int k=0;k<Jobs.Count;k++){Jobs[k].D.Order=k;Save(Jobs[k]);}}}
  public void Remove(Job j){if(j.Working)throw new NeedAction("Pausa la tarea antes de retirarla.");j.D.Removed=true;j.D.Desired=false;Save(j);lock(Gate)Jobs.Remove(j);}
  void Check(Job j){if(j.Stop||Closing)throw new OperationCanceledException();}
  HttpWebRequest Request(Job j,long from,long to,bool ranged) {
-  var r=(HttpWebRequest)WebRequest.Create(j.D.Url);r.UserAgent="DrexDownloads/1.0.1";r.Timeout=30000;r.ReadWriteTimeout=60000;r.AllowAutoRedirect=true;r.MaximumAutomaticRedirections=8;r.AutomaticDecompression=DecompressionMethods.None;r.Headers[HttpRequestHeader.AcceptEncoding]="identity";
+  var r=(HttpWebRequest)WebRequest.Create(j.D.Url);r.UserAgent="DrexDownloads/1.0.7";r.CachePolicy=new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.NoCacheNoStore);r.Timeout=30000;r.ReadWriteTimeout=60000;r.AllowAutoRedirect=true;r.MaximumAutomaticRedirections=8;r.AutomaticDecompression=DecompressionMethods.None;r.Headers[HttpRequestHeader.AcceptEncoding]="identity";
   if(ranged){r.AddRange(from,to);if(!string.IsNullOrEmpty(j.D.ETag)&&!j.D.ETag.StartsWith("W/"))r.Headers[HttpRequestHeader.IfRange]=j.D.ETag;}
   if(r.RequestUri.Scheme=="https"&&r.RequestUri.Host.Equals("huggingface.co",StringComparison.OrdinalIgnoreCase)){string token=Store.Unprotect(j.D.TokenProtected);if(!string.IsNullOrEmpty(token))r.Headers[HttpRequestHeader.Authorization]="Bearer "+token;}
   return r;
  }
- HttpWebResponse Response(HttpWebRequest r){try{return (HttpWebResponse)r.GetResponse();}catch(WebException ex){var resp=ex.Response as HttpWebResponse;if(resp!=null){int code=(int)resp.StatusCode;string retry=resp.Headers["Retry-After"];resp.Close();if(code==429||code==503){int seconds=0;DateTime until;if(!int.TryParse(retry,out seconds)&&DateTime.TryParse(retry,System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.AdjustToUniversal,out until))seconds=(int)Math.Max(0,(until.ToUniversalTime()-DateTime.UtcNow).TotalSeconds);throw new RetryLater(code,Math.Max(0,Math.Min(86400,seconds)));}if(code==401||code==403)throw new NeedAction("Enlace caducado o acceso denegado ("+code+"). Renueva el enlace o revisa el token.");if(code==404||code==410)throw new NeedAction("El archivo no está disponible ("+code+"). Renueva el enlace.");if(code==416)throw new NeedAction("El servidor rechazó el rango. Se conserva el progreso; no se reiniciará desde cero.");}throw;}}
+ HttpWebResponse Response(HttpWebRequest r){try{return (HttpWebResponse)r.GetResponse();}catch(WebException ex){var resp=ex.Response as HttpWebResponse;if(resp!=null){int code=(int)resp.StatusCode;string retry=resp.Headers["Retry-After"];resp.Close();if(code==429||code==503){int seconds=0;DateTime until;if(!int.TryParse(retry,out seconds)&&DateTime.TryParse(retry,System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.AdjustToUniversal,out until))seconds=(int)Math.Max(0,(until.ToUniversalTime()-DateTime.UtcNow).TotalSeconds);throw new RetryLater(code,Math.Max(0,Math.Min(86400,seconds)));}if(code==401||code==403)throw new ExpiredLink(resp.ResponseUri!=r.RequestUri);if(code==404||code==410)throw new NeedAction("El archivo no está disponible ("+code+"). Renueva el enlace.");if(code==416)throw new NeedAction("El servidor rechazó el rango. Se conserva el progreso; no se reiniciará desde cero.");}throw;}}
  long ParseRange(HttpWebResponse r,long start,long? end) {var m=Regex.Match(r.Headers["Content-Range"]??"",@"^bytes (\d+)-(\d+)/(\d+)$");long a,b,t;if(!m.Success||!long.TryParse(m.Groups[1].Value,out a)||!long.TryParse(m.Groups[2].Value,out b)||!long.TryParse(m.Groups[3].Value,out t)||a!=start||b<a||b>=t||(end.HasValue&&b!=end.Value))throw new NeedAction("Respuesta parcial inválida. No se modificaron bloques confirmados.");return t;}
  void Probe(Job j) {
   j.D.State="Comprobando origen";Check(j);
@@ -130,7 +138,7 @@ public class Engine : IDisposable {
   var uri=new Uri(j.D.Url);
   if(uri.Host.Equals("huggingface.co",StringComparison.OrdinalIgnoreCase)&&uri.AbsolutePath.Contains("/resolve/")){
    var head=Request(j,0,0,false);head.Method="HEAD";head.AllowAutoRedirect=false;
-   try{using(var hr=(HttpWebResponse)head.GetResponse()){string commit=hr.Headers["X-Repo-Commit"];if(!string.IsNullOrEmpty(commit)&&Regex.IsMatch(commit,"^[a-fA-F0-9]{40}$")){if(!string.IsNullOrEmpty(j.D.PinnedCommit)&&j.D.PinnedCommit!=commit)throw new NeedAction("La revisión de Hugging Face cambió. Se conservan tus partes.");j.D.PinnedCommit=commit;var ub=new UriBuilder(j.D.Url);ub.Path=Regex.Replace(uri.AbsolutePath,@"/resolve/[^/]+/","/resolve/"+commit+"/");j.D.Url=ub.Uri.AbsoluteUri;}}}catch(WebException ex){if(ex.Response!=null)ex.Response.Close();/* regular GET below reports failures */}
+   try{using(var hr=(HttpWebResponse)head.GetResponse()){string commit=hr.Headers["X-Repo-Commit"];if(!string.IsNullOrEmpty(commit)&&Regex.IsMatch(commit,"^[a-fA-F0-9]{40}$")){if(!string.IsNullOrEmpty(j.D.PinnedCommit)&&j.D.PinnedCommit!=commit)throw new NeedAction("La revisión de Hugging Face cambió. Se conservan tus partes.");j.D.PinnedCommit=commit;var ub=new UriBuilder(j.D.Url);ub.Path=Regex.Replace(uri.AbsolutePath,@"/resolve/[^/]+/","/resolve/"+commit+"/");j.D.Url=ub.Uri.AbsoluteUri;j.D.OriginUrl=j.D.Url;}}}catch(WebException ex){if(ex.Response!=null)ex.Response.Close();/* regular GET below reports failures */}
   }
   var req=Request(j,0,0,true);using(var r=Response(req)){
    if(Regex.IsMatch(j.D.Name,"^[0-9a-fA-F]{64}$")){

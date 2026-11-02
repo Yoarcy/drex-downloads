@@ -16,6 +16,25 @@ class EngineChecks{
   }
   using(var e=new Engine(Path.Combine(root,"retry"))){var j=e.Add(url+"/flaky",outdir,"flaky.bin",hash,1,0,"",true);e.Start();Wait(()=>j.D.Completed||!j.D.Desired,45);Assert(j.D.Completed&&j.D.ActualHash==hash,"network_truncation_auto_recovers");}
   using(var e=new Engine(Path.Combine(root,"busy"))){var j=e.Add(url+"/busy",outdir,"busy.bin",hash,1,0,"",true);var watch=Stopwatch.StartNew();e.Start();Wait(()=>j.D.Completed||!j.D.Desired,20);Assert(j.D.Completed&&watch.Elapsed.TotalSeconds>=2,"retry_after_respected");}
+  string restartRoot=Path.Combine(root,"restartapp");
+  using(var e=new Engine(Path.Combine(restartRoot,"data"))){
+   var j=e.Add(url+"/file",outdir,"restart.bin",hash,1,0,"",false);
+   RestartControl.Update(restartRoot,e,"dummy.exe",false);Assert(!File.Exists(Path.Combine(restartRoot,"data","restart.json")),"idle_no_autostart_marker");
+   j.D.Desired=true;j.Working=true;e.Save(j);RestartControl.Update(restartRoot,e,"dummy.exe",false);
+   Assert(!RestartControl.ShouldRecover(restartRoot,RestartControl.BootUtc),"same_boot_does_not_autolaunch");
+   var marker=Path.Combine(restartRoot,"data","restart.json");var state=Store.Unwrap<RestartState>(File.ReadAllBytes(marker));state.BootUtc=RestartControl.BootUtc.AddDays(-1);Store.Atomic(marker,Store.Wrap(state));
+   Assert(RestartControl.ShouldRecover(restartRoot,RestartControl.BootUtc),"interrupted_active_job_recovers_on_new_boot");
+   j.D.Desired=false;e.Save(j);Assert(!RestartControl.ShouldRecover(restartRoot,RestartControl.BootUtc),"paused_metadata_overrides_stale_marker");
+   j.D.Desired=true;j.D.Completed=true;e.Save(j);Assert(!RestartControl.ShouldRecover(restartRoot,RestartControl.BootUtc),"completed_job_does_not_autolaunch");
+   j.D.Completed=false;e.Save(j);RestartControl.Disarm(restartRoot,false);Assert(!RestartControl.ShouldRecover(restartRoot,RestartControl.BootUtc),"clean_exit_disarms_recovery");
+   File.WriteAllText(marker,"corrupted");Assert(!RestartControl.ShouldRecover(restartRoot,RestartControl.BootUtc),"corrupt_marker_does_not_autolaunch");
+   j.Working=false;
+  }
+  using(var e=new Engine(Path.Combine(root,"autorefresh"))){
+   var j=e.Add(url+"/file",outdir,"auto-refresh.bin",hash,1,512,"",true);e.Start();Wait(()=>j.D.Saved>0,15);e.Pause(j);Wait(()=>!j.Working,10);long kept=j.D.Saved;j.D.LimitKiB=0;e.Renew(j,url+"/refresh");Wait(()=>j.D.Completed||!j.D.Desired,35);Assert(j.D.Completed&&j.D.ActualHash==hash&&kept>0&&j.RefreshAttempts>0,"expired_link_auto_refresh_keeps_partial");
+  }
+  using(var e=new Engine(Path.Combine(root,"permanentdenial"))){var j=e.Add(url+"/denied",outdir,"denied.bin",hash,1,0,"",true);e.Start();Wait(()=>!j.D.Desired,15);Assert(!j.D.Completed&&j.RefreshAttempts==4,"permanent_auth_denial_stops_bounded");}
+  using(var e=new Engine(Path.Combine(root,"offlineboot"))){var j=e.Add(url+"/offlineboot",outdir,"offline-boot.bin",hash,1,0,"",true);e.Start();Wait(()=>j.D.Completed||!j.D.Desired,100);Assert(j.D.Completed&&j.D.ActualHash==hash,"network_wait_survives_five_failures");}
   return 0;
  }catch(Exception ex){Console.WriteLine("FAIL "+ex.Message);return 1;}}
 }
