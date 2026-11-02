@@ -16,6 +16,11 @@ class EngineChecks{
   }
   using(var e=new Engine(Path.Combine(root,"retry"))){var j=e.Add(url+"/flaky",outdir,"flaky.bin",hash,1,0,"",true);e.Start();Wait(()=>j.D.Completed||!j.D.Desired,45);Assert(j.D.Completed&&j.D.ActualHash==hash,"network_truncation_auto_recovers");}
   using(var e=new Engine(Path.Combine(root,"busy"))){var j=e.Add(url+"/busy",outdir,"busy.bin",hash,1,0,"",true);var watch=Stopwatch.StartNew();e.Start();Wait(()=>j.D.Completed||!j.D.Desired,20);Assert(j.D.Completed&&watch.Elapsed.TotalSeconds>=2,"retry_after_respected");}
+  using(var e=new Engine(Path.Combine(root,"fourconnections"))){
+   var j=e.Add(url+"/large",outdir,"four-connections.bin","",4,1024,"",true);e.Start();
+   Wait(()=>j.ActiveConnections==4,20);Assert(j.ActiveConnections==4,"four_simultaneous_transfer_streams");
+   e.Pause(j);Wait(()=>!j.Working,15);Assert(j.ActiveConnections==0&&j.D.Saved>0,"connection_counter_zero_after_pause");
+  }
   string restartRoot=Path.Combine(root,"restartapp");
   using(var e=new Engine(Path.Combine(restartRoot,"data"))){
    var j=e.Add(url+"/file",outdir,"restart.bin",hash,1,0,"",false);

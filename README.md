@@ -6,13 +6,13 @@
 
 Proyecto de [Yoarcy](https://github.com/Yoarcy). Desarrollado en C# / Windows Forms con motor HTTP propio sobre .NET Framework. No depende de IDM, aria2, OpenClaw ni servicios de IA para descargar.
 
-[Descargar versión 1.0.7](https://github.com/Yoarcy/drex-downloads/releases/tag/v1.0.7) · [Manual](LEEME.txt) · [Arquitectura](docs/ARQUITECTURA.md) · [Compilación](docs/BUILD.md)
+[Descargar versión 1.0.8](https://github.com/Yoarcy/drex-downloads/releases/tag/v1.0.8) · [Manual](LEEME.txt) · [Arquitectura](docs/ARQUITECTURA.md) · [Compilación](docs/BUILD.md)
 
 ![Interfaz de Drex Downloads](docs/interfaz.png)
 
 ## Funciones
 
-- Cola secuencial y hasta cuatro conexiones por archivo.
+- Cola secuencial y hasta cuatro conexiones por archivo; contador de conexiones activas en detalles y pie de la descarga.
 - Pausa, reanudación y renovación manual de enlaces.
 - Guardado incremental con doble diario y comprobación SHA-256 por bloques.
 - Recuperación de bloques válidos tras interrupciones; los parciales no se eliminan por un error.
@@ -26,7 +26,7 @@ Proyecto de [Yoarcy](https://github.com/Yoarcy). Desarrollado en C# / Windows Fo
 
 Windows de escritorio con **.NET Framework 4.8**. Compilación AnyCPU; la ruta de compilación incluida usa el compilador de Windows de 64 bits. No se ha validado una matriz completa de versiones de Windows.
 
-1. Descarga `DrexDownloads-Setup-1.0.7.exe` desde Releases.
+1. Descarga `DrexDownloads-Setup-1.0.8.exe` desde Releases.
 2. Ejecuta el instalador y elige una **carpeta vacía** con permisos de escritura.
 3. Abre `DrexDownloads.exe`. El instalador no inicia descargas ni cambia el firewall.
 
@@ -46,7 +46,7 @@ Reanudar requiere soporte de rangos y validación de identidad/tamaño. No desca
 
 ## Estado de las pruebas
 
-- **41/41 pruebas locales aprobadas en 1.0.7**: motor, recuperación, identidad, pausas, arranque condicional, renovación de enlaces y espera de red.
+- **43/43 pruebas locales aprobadas en 1.0.8**: motor, recuperación, identidad, pausas, arranque condicional, renovación de enlaces y espera de red.
 - Compilación, interfaz, extracción del instalador y supervisor incrustado verificados.
 - Cinco casos de portabilidad de red y pruebas reales LAN/RDP/SMB, bloqueo HTTPS y restauración aprobados en 1.0.6.
 - No se realizó un apagón físico. El arranque condicional se prueba con metadatos y cambios simulados de arranque.
@@ -74,3 +74,7 @@ El repositorio y las distribuciones no incluyen descargas, historial de tareas, 
 ## Desarrollo y contribuciones
 
 Consulta [BUILD.md](docs/BUILD.md). Reporta errores con pasos reproducibles y sin datos privados. No hay licencia de código abierto concedida en esta publicación; la disponibilidad del código no implica permiso general de redistribución o modificación. La licencia queda pendiente de decisión del titular.
+
+### Estado de la versión 1.0.8
+
+[Validación y límites de autonomía](docs/VALIDACION-1.0.8.md). El contador de hilos distingue conexiones configuradas de transferencias realmente activas. Renovar enlace reutiliza el origen estable guardado sin exigir pegar otra URL.

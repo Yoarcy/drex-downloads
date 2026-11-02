@@ -61,6 +61,7 @@ public class Job {
  public long NetworkBytes;
  public long LastReceiveTicks=DateTime.UtcNow.Ticks;
  public int ActiveCommits;
+ public int ActiveConnections;
  public double Speed;
  public int Attempts, RefreshAttempts;
  public long RefreshSaved=-1;
@@ -125,7 +126,7 @@ public class Engine : IDisposable {
  public void Remove(Job j){if(j.Working)throw new NeedAction("Pausa la tarea antes de retirarla.");j.D.Removed=true;j.D.Desired=false;Save(j);lock(Gate)Jobs.Remove(j);}
  void Check(Job j){if(j.Stop||Closing)throw new OperationCanceledException();}
  HttpWebRequest Request(Job j,long from,long to,bool ranged) {
-  var r=(HttpWebRequest)WebRequest.Create(j.D.Url);r.UserAgent="DrexDownloads/1.0.7";r.CachePolicy=new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.NoCacheNoStore);r.Timeout=30000;r.ReadWriteTimeout=60000;r.AllowAutoRedirect=true;r.MaximumAutomaticRedirections=8;r.AutomaticDecompression=DecompressionMethods.None;r.Headers[HttpRequestHeader.AcceptEncoding]="identity";
+  var r=(HttpWebRequest)WebRequest.Create(j.D.Url);r.UserAgent="DrexDownloads/1.0.8";r.CachePolicy=new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.NoCacheNoStore);r.Timeout=30000;r.ReadWriteTimeout=60000;r.AllowAutoRedirect=true;r.MaximumAutomaticRedirections=8;r.AutomaticDecompression=DecompressionMethods.None;r.Headers[HttpRequestHeader.AcceptEncoding]="identity";
   if(ranged){r.AddRange(from,to);if(!string.IsNullOrEmpty(j.D.ETag)&&!j.D.ETag.StartsWith("W/"))r.Headers[HttpRequestHeader.IfRange]=j.D.ETag;}
   if(r.RequestUri.Scheme=="https"&&r.RequestUri.Host.Equals("huggingface.co",StringComparison.OrdinalIgnoreCase)){string token=Store.Unprotect(j.D.TokenProtected);if(!string.IsNullOrEmpty(token))r.Headers[HttpRequestHeader.Authorization]="Bearer "+token;}
   return r;
@@ -185,6 +186,7 @@ public class Engine : IDisposable {
  void DownloadRange(Job j,FileStream output,long start,long end,bool allowFull) {
   Check(j);var request=Request(j,start,end,true);
   using(var response=Response(request)){
+   Interlocked.Increment(ref j.ActiveConnections);try{
    if(response.StatusCode==HttpStatusCode.PartialContent){if(ParseRange(response,start,end)!=j.D.Size)throw new NeedAction("El tamaño remoto cambió durante la descarga.");}
    else if(!(allowFull&&start==0&&end==j.D.Size-1&&response.StatusCode==HttpStatusCode.OK&&response.ContentLength==j.D.Size))throw new NeedAction("El servidor ignoró el rango solicitado. Se preservan las partes existentes.");
    string et=response.Headers["ETag"];if(!string.IsNullOrEmpty(j.D.ETag)&&!j.D.ETag.StartsWith("W/")&&et!=j.D.ETag)throw new NeedAction("El archivo cambió durante la descarga. Se detuvo para proteger el progreso.");
@@ -199,6 +201,7 @@ public class Engine : IDisposable {
       if(limit!=int.MaxValue){double target=(double)rateBytes/(limit*1024.0/Math.Max(1,j.D.Connections))*1000;while(rate.ElapsedMilliseconds<target){Check(j);if(checkpoint.ElapsedMilliseconds>=5000&&pending.Length>0){Commit(j,output,blockStart,pending);blockStart=position;checkpoint.Restart();}Thread.Sleep(50);}}
     }}finally{Commit(j,output,blockStart,pending);}
    }
+   }finally{Interlocked.Decrement(ref j.ActiveConnections);}
   }
  }
  public void Run(Job j){

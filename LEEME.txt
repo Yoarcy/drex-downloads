@@ -1,4 +1,4 @@
-DREX DOWNLOADS 1.0.7 — Gestor local de descargas para Windows
+DREX DOWNLOADS 1.0.8 — Gestor local de descargas para Windows
 ========================================================
 
 ABRIR
@@ -72,3 +72,9 @@ Marca la casilla y acepta, si Windows lo solicita, el permiso de administrador. 
 
 RENOVACIÓN AUTÓNOMA
 Se reintenta desde el enlace de origen estable sin IA y conservando la identidad del archivo. Una URL firmada caducada sin origen, permisos faltantes o CAPTCHA no se pueden renovar sin datos adicionales.
+
+CONEXIONES Y RENOVACIÓN (1.0.8)
+Selecciona una descarga: el pie muestra hilos activos/configurados. Pueden bajar temporalmente al comprobar el origen, renovar, guardar o finalizar rangos.
+Renovar enlace pausa y conserva el progreso y vuelve al origen estable guardado. Si solo hay un enlace temporal, pide otro enlace.
+El motor renueva automáticamente ante caducidad y reintenta fallos transitorios de red mientras el programa siga abierto. Una denegación permanente, archivo cambiado, disco lleno o hash incorrecto exige atención; no se oculta el error ni se borran parciales.
+Internet exclusivo no garantiza una velocidad concreta ni elimina los límites del proveedor. Chrome y los procesos permitidos todavía pueden consumir ancho de banda.

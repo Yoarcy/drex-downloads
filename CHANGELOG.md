@@ -1,3 +1,12 @@
+## 1.0.8
+
+- Contador de transferencias activas/configuradas en detalles y estado de la descarga.
+- Diagnóstico local cada cinco segundos sin URLs ni credenciales: `data/runtime-status.json`.
+- «Renovar enlace» pausa de forma segura y reabre el origen estable guardado; pide otro enlace solo si el guardado es temporal.
+- Cuatro conexiones por defecto en descargas nuevas; las existentes conservan su configuración.
+- Prueba de cuatro transferencias simultáneas y contador a cero tras pausa.
+- Mantiene recuperación condicional al iniciar sesión y reintentos/renovación autónomos de 1.0.7.
+
 # Cambios
 
 ## 1.0.7

@@ -1,0 +1,221 @@
+{
+  "results": [
+    {
+      "name": "large_file_sparse_flag",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "large_file_bounded_frontier",
+      "passed": true,
+      "detail": "logical_bytes=9764864, remote_bytes=19327352832"
+    },
+    {
+      "name": "large_file_bounded_requests",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "html_error_not_saved_as_binary",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "normal_parallel_hash",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "server_without_ranges_initial",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "zero_byte_file",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "wrong_hash_preserves_partial",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "wrong_hash_no_final_file",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "killed_process_resume",
+      "passed": true,
+      "detail": "checkpoint bytes=2686976"
+    },
+    {
+      "name": "corrupt_block_and_torn_journal_recovery",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "metadata_fallback",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "changed_identity_preserved",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "expired_link_preserved",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "renewed_link_resume",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "range_disappears_no_overwrite",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "missing_identity_blocks_resume",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "selective_repair_keeps_healthy_block",
+      "passed": true,
+      "detail": "rerequested=4194305 of 16777216"
+    },
+    {
+      "name": "paused_task_does_not_autostart",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "pause_flushes_and_stops",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "manual_pause_survives_restart",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "restored_pause_is_respected",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "resume_button_completes_exact_file",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "queue_reorder",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "queue_multiple_downloads",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "remove_preserves_final_file",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "filename_collision_preserves_original",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "network_truncation_auto_recovers",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "retry_after_respected",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "four_simultaneous_transfer_streams",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "connection_counter_zero_after_pause",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "idle_no_autostart_marker",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "same_boot_does_not_autolaunch",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "interrupted_active_job_recovers_on_new_boot",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "paused_metadata_overrides_stale_marker",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "completed_job_does_not_autolaunch",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "clean_exit_disarms_recovery",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "corrupt_marker_does_not_autolaunch",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "expired_link_auto_refresh_keeps_partial",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "permanent_auth_denial_stops_bounded",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "network_wait_survives_five_failures",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "engine_lifecycle_suite_exit",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "publication_crash_reconciled",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "passed": 43,
+  "total": 43
+}
