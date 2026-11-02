@@ -20,3 +20,6 @@ show.request
 /tests/latest-report.json
 /dist/
 .env*
+
+/network/helper-error.txt
+/network/integrated.version

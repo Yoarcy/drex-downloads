@@ -1,5 +1,11 @@
 # Cambios
 
+## 1.0.6
+- La LAN queda fuera de la restricción de Internet: RDP, SMB, redes privadas y descubrimiento local.
+- Supervisor incrustado en el ejecutable, activación elevada desde la app y recuperación al inicio preparada automáticamente.
+- Eliminada la instalación manual de scripts.
+- Cinco casos de portabilidad, LAN, bloqueo HTTPS y restauración verificados.
+
 ## 1.0.5
 - Icono original multirresolución integrado en app e instalador.
 - Barra de título con textura y colores de la cabecera.

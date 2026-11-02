@@ -15,6 +15,8 @@ static class Program {
  [DllImport("user32.dll")]static extern bool SetForegroundWindow(IntPtr handle);
  [DllImport("user32.dll")]static extern bool ShowWindow(IntPtr handle,int command);
  [STAThread] static int Main(string[] args){
+  if(args.Length>0&&args[0]=="--network-guard")return NetworkControl.Run();
+  if(args.Length==2&&args[0]=="--network-recover")return NetworkControl.Run(Encoding.UTF8.GetString(Convert.FromBase64String(args[1])));
   Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
   if(args.Length>0&&args[0]=="--test-download")return TestDownload(args);
   if(args.Length>0&&args[0]=="--verify-state")return Verify(args);
@@ -75,7 +77,7 @@ public class MainForm:Form {
   var searchBar=new Panel{Dock=DockStyle.Top,Height=32,Padding=new Padding(14,2,14,4)};
   filter.Width=205;filter.Location=new Point(14,3);filter.BackColor=panel;filter.ForeColor=fg;filter.BorderStyle=BorderStyle.FixedSingle;filter.TextChanged+=(s,e)=>RefreshGrid();
   var searchLabel=new Label{Text="Buscar por nombre",AutoSize=true,Location=new Point(230,5),ForeColor=Color.Silver};searchBar.Controls.AddRange(new Control[]{filter,searchLabel});exclusive.Text="Internet exclusivo";exclusive.AutoSize=true;exclusive.Location=new Point(370,4);exclusive.Checked=File.Exists(Path.Combine(root,"network","enabled.flag"));
-  exclusive.CheckedChanged+=(s,e)=>{try{string f=Path.Combine(root,"network","enabled.flag");if(exclusive.Checked)File.WriteAllText(f,"enabled");else if(File.Exists(f))File.Delete(f);NetworkLease();}catch(Exception ex){MessageBox.Show(ex.Message);}};
+  exclusive.CheckedChanged+=(s,e)=>{try{if(exclusive.Checked){NetworkLease();NetworkControl.Ensure();}string f=Path.Combine(root,"network","enabled.flag");if(exclusive.Checked)File.WriteAllText(f,"enabled");else if(File.Exists(f))File.Delete(f);NetworkLease();}catch(Exception ex){exclusive.Checked=false;MessageBox.Show(ex.Message);}};
   networkState.Location=new Point(510,5);networkState.Size=new Size(240,22);networkState.AutoEllipsis=true;networkState.ForeColor=Color.Silver;searchBar.Controls.Add(exclusive);searchBar.Controls.Add(networkState);
   Controls.Add(searchBar);searchBar.BringToFront();
   var footer=new TexturePanel{Dock=DockStyle.Bottom,Height=76,Padding=new Padding(14,7,14,5),BackColor=panel};
@@ -94,7 +96,7 @@ public class MainForm:Form {
   tray=new NotifyIcon{Icon=Icon,Text="Drex Downloads",Visible=true,ContextMenuStrip=menu};tray.DoubleClick+=(s,e)=>Restore();
   var options=new ToolStripMenuItem("Iniciar con Windows"){Checked=File.Exists(StartupFile),CheckOnClick=true};options.Click+=(s,e)=>SetStartup(options.Checked);menu.Items.Insert(2,options);
   timer=new System.Windows.Forms.Timer{Interval=1000};timer.Tick+=(s,e)=>{RefreshGrid();NetworkLease();string request=Path.Combine(root,"show.request");if(File.Exists(request)){try{File.Delete(request);}catch{}Restore();}};timer.Start();
-  Shown+=(s,e)=>{RefreshGrid();if(!string.IsNullOrEmpty(engine.StartupWarning))MessageBox.Show(this,engine.StartupWarning,"Recuperación");};
+  Shown+=(s,e)=>{RefreshGrid();if(exclusive.Checked || File.Exists(Path.Combine(root,"network","snapshot.json"))){try{NetworkLease();NetworkControl.Ensure();}catch(Exception ex){exclusive.Checked=false;MessageBox.Show(ex.Message);}}if(!string.IsNullOrEmpty(engine.StartupWarning))MessageBox.Show(this,engine.StartupWarning,"Recuperación");};
   FormClosing+=(s,e)=>{if(!exiting&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();tray.ShowBalloonTip(2500,"Drex Downloads","Sigo descargando en segundo plano. Puedes abrirme desde la bandeja.",ToolTipIcon.Info);}else{timer.Stop();NetworkLease(true);engine.Dispose();tray.Visible=false;tray.Dispose();}};
   AddTitleBar();
   engine.Start();
@@ -113,7 +115,7 @@ public class MainForm:Form {
   minimize.Click+=(o,e)=>WindowState=FormWindowState.Minimized;close.Click+=(o,e)=>Close();
   caption.Controls.AddRange(new Control[]{mark,name,minimize,close});Controls.Add(caption);
  }
- void NetworkLease(bool stop=false){try{string dir=Path.Combine(root,"network");Directory.CreateDirectory(dir);bool active;lock(engine.Gate)active=engine.Jobs.Any(j=>j.D.Desired&&!j.D.Completed&&!j.D.Removed);Store.Atomic(Path.Combine(dir,"lease.json"),Encoding.UTF8.GetBytes("{\"enabled\":"+(exclusive.Checked&&!stop?"true":"false")+",\"active\":"+(active&&!stop?"true":"false")+"}"));string f=Path.Combine(dir,"status.txt");networkState.Text=File.Exists(f)?File.ReadAllText(f):"Supervisor no disponible";if(File.Exists(f)&&(DateTime.UtcNow-File.GetLastWriteTimeUtc(f)).TotalSeconds>20)networkState.Text="Supervisor sin respuesta";}catch{networkState.Text="Error del control de red";}}
+ void NetworkLease(bool stop=false){try{string dir=Path.Combine(root,"network");Directory.CreateDirectory(dir);bool active;lock(engine.Gate)active=engine.Jobs.Any(j=>j.D.Desired&&!j.D.Completed&&!j.D.Removed);Store.Atomic(Path.Combine(dir,"lease.json"),Encoding.UTF8.GetBytes("{\"enabled\":"+(exclusive.Checked&&!stop?"true":"false")+",\"active\":"+(active&&!stop?"true":"false")+"}"));string f=Path.Combine(dir,"status.txt");networkState.Text=File.Exists(f)?File.ReadAllText(f):"Internet normal · LAN libre";if(exclusive.Checked&&File.Exists(f)&&(DateTime.UtcNow-File.GetLastWriteTimeUtc(f)).TotalSeconds>20)networkState.Text="Supervisor sin respuesta";}catch{networkState.Text="Error del control de red";}}
  string StartupFile {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup),"Drex Downloads.vbs");}}
  void SetStartup(bool enable){try{if(enable){string exe=Application.ExecutablePath.Replace("\"","\"\"");File.WriteAllText(StartupFile,"CreateObject(\"WScript.Shell\").Run Chr(34) & \""+exe+"\" & Chr(34), 1, False\r\n");}else if(File.Exists(StartupFile))File.Delete(StartupFile);}catch(Exception ex){MessageBox.Show(ex.Message);}}
  Button Button(string text,Action action,bool primary=false){var b=new SoftButton{Text=text,AutoSize=false,Height=34,Width=TextRenderer.MeasureText(text,Font).Width+24,FlatStyle=FlatStyle.Flat,BackColor=primary?accent:panel,ForeColor=primary?bg:fg,Margin=new Padding(3,0,3,0),Padding=new Padding(4,0,4,0)};b.FlatAppearance.BorderSize=0;b.Click+=(s,e)=>{try{action();}catch(Exception ex){MessageBox.Show(this,ex.Message,"Drex Downloads",MessageBoxButtons.OK,MessageBoxIcon.Information);}};return b;}

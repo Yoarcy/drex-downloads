@@ -1,4 +1,4 @@
-DREX DOWNLOADS 1.0.5 — Gestor local de descargas para Windows
+DREX DOWNLOADS 1.0.6 — Gestor local de descargas para Windows
 ========================================================
 
 ABRIR
@@ -66,3 +66,6 @@ data             : historial y configuración de tareas (no borrar).
 Descargas        : destino predeterminado.
 
 No hay suscripción ni llamadas a servicios de IA durante las descargas.
+
+INTERNET EXCLUSIVO INTEGRADO
+Marca la casilla y acepta, si Windows lo solicita, el permiso de administrador. No requiere instalar scripts ni componentes aparte. La LAN permanece permitida. La app prepara automáticamente la recuperación tras reinicio. Consulta docs/NETWORK.md.

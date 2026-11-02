@@ -30,7 +30,7 @@ class Installer:Form {
   Controls.Add(new Label{Text="Carpeta de instalación (vacía):",Bounds=new Rectangle(22,108,550,24)});
   folder.SetBounds(22,140,450,28);folder.Text=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Programs","Drex Downloads");Controls.Add(folder);
   var browse=new Button{Text="Elegir…",Bounds=new Rectangle(482,138,95,30)};browse.Click+=(s,e)=>{using(var d=new FolderBrowserDialog())if(d.ShowDialog()==DialogResult.OK)folder.Text=d.SelectedPath;};Controls.Add(browse);
-  status.SetBounds(22,183,555,48);status.Text="No modifica tus descargas. Internet exclusivo requiere instalar\nel componente de red como administrador (network/install.ps1).";Controls.Add(status);
+  status.SetBounds(22,183,555,48);status.Text="No modifica tus descargas. Internet exclusivo está integrado. Windows puede pedir\npermiso de administrador al activarlo. La LAN permanece libre.";Controls.Add(status);
   var install=new Button{Text="Instalar",Bounds=new Rectangle(437,245,140,36),BackColor=Color.FromArgb(65,215,170),ForeColor=Color.FromArgb(20,25,34),FlatStyle=FlatStyle.Flat};
   install.Click+=(s,e)=>{try{
    Extract(folder.Text);

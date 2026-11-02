@@ -6,7 +6,7 @@
 
 Proyecto de [Yoarcy](https://github.com/Yoarcy). Desarrollado en C# / Windows Forms con motor HTTP propio sobre .NET Framework. No depende de IDM, aria2, OpenClaw ni servicios de IA para descargar.
 
-[Descargar versión 1.0.5](https://github.com/Yoarcy/drex-downloads/releases/tag/v1.0.5) · [Manual](LEEME.txt) · [Arquitectura](docs/ARQUITECTURA.md) · [Compilación](docs/BUILD.md)
+[Descargar versión 1.0.6](https://github.com/Yoarcy/drex-downloads/releases/tag/v1.0.6) · [Manual](LEEME.txt) · [Arquitectura](docs/ARQUITECTURA.md) · [Compilación](docs/BUILD.md)
 
 ![Interfaz de Drex Downloads](docs/interfaz.png)
 
@@ -25,13 +25,13 @@ Proyecto de [Yoarcy](https://github.com/Yoarcy). Desarrollado en C# / Windows Fo
 
 Windows de escritorio con **.NET Framework 4.8**. Compilación AnyCPU; la ruta de compilación incluida usa el compilador de Windows de 64 bits. No se ha validado una matriz completa de versiones de Windows.
 
-1. Descarga `DrexDownloads-Setup-1.0.5.exe` desde Releases.
+1. Descarga `DrexDownloads-Setup-1.0.6.exe` desde Releases.
 2. Ejecuta el instalador y elige una **carpeta vacía** con permisos de escritura.
 3. Abre `DrexDownloads.exe`. El instalador no inicia descargas ni cambia el firewall.
 
 También existe un ZIP portable. No requiere Python para el uso normal. Los ejecutables no están firmados digitalmente.
 
-**Internet exclusivo se instala por separado**, con permisos de administrador: consulta [la guía del componente de red](docs/NETWORK.md). El instalador no instala ese componente automáticamente.
+**Internet exclusivo está integrado en el ejecutable.** Al activarlo, Windows puede pedir permisos de administrador. La preparación del supervisor y de la recuperación al inicio es automática: no hay scripts ni paquetes que instalar aparte. Consulta [la guía del control de red](docs/NETWORK.md).
 
 ## Uso rápido
 
@@ -46,17 +46,17 @@ Reanudar requiere soporte de rangos y validación de identidad/tamaño. No desca
 ## Estado de las pruebas
 
 - 31 comprobaciones históricas del motor: [resultado](docs/test-results-historical.json).
-- En 1.0.5: compilación, interfaz, extracción del instalador e igualdad SHA-256 del ejecutable comprobadas; motor sin cambios respecto al respaldo anterior.
+- En 1.0.6: compilación, interfaz, extracción del instalador e igualdad SHA-256 del ejecutable comprobadas; motor sin cambios respecto al respaldo anterior.
 - La suite completa no se volvió a ejecutar para este cambio visual.
 - La instalación física en una segunda PC sigue pendiente de validación.
-- Casos simulados de portabilidad de red incluidos; aún no se presentan como pruebas aprobadas.
+- Cinco casos simulados de portabilidad aprobados. LAN/RDP/SMB, bloqueo de Internet y restauración comprobados en el equipo de desarrollo.
 
 ## Estructura
 
 | Ruta | Contenido |
 |---|---|
 | `src/` | Motor, interfaz, instalador y scripts de compilación |
-| `network/` | Supervisor opcional del firewall y registro de tarea |
+| `network/` | Fuente del supervisor, incrustada al compilar |
 | `tests/` | Pruebas con servidor HTTP local y recuperación |
 | `assets/` | Icono PNG/ICO y prompt de creación |
 | `docs/` | Arquitectura, instalación, cambios y evidencias |

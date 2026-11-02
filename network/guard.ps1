@@ -1,9 +1,37 @@
 $ErrorActionPreference='Stop'
-$root=Split-Path $PSScriptRoot -Parent
-$state=Join-Path $PSScriptRoot 'snapshot.json'
-$lease=Join-Path $PSScriptRoot 'lease.json'
-$status=Join-Path $PSScriptRoot 'status.txt'
+if(!$DrexRoot){throw 'This supervisor must be launched by Drex Downloads'}
+$root=$DrexRoot
+$runtime=Join-Path $root 'network'
+[IO.Directory]::CreateDirectory($runtime)|Out-Null
+$state=Join-Path $runtime 'snapshot.json'
+$lease=Join-Path $runtime 'lease.json'
+$status=Join-Path $runtime 'status.txt'
 $group='DrexDownloads.Exclusive.v1'
+# Migrate only the legacy task belonging to this installation, while it is idle.
+$legacy=Get-ScheduledTask -TaskName 'Drex Downloads - Network Guard' -ErrorAction SilentlyContinue
+if($legacy){
+ $expected=Join-Path $runtime 'guard.ps1'
+ if(@($legacy.Actions | Where-Object {$_.Arguments -like ('*'+$expected+'*')}).Count -eq 0){throw 'Another installation owns the legacy supervisor'}
+ if(Test-Path $state){throw 'Disable the legacy exclusive mode before upgrading'}
+ Stop-ScheduledTask -TaskName $legacy.TaskName
+ Unregister-ScheduledTask -TaskName $legacy.TaskName -Confirm:$false
+ Start-Sleep -Milliseconds 500
+}
+# Automatic reboot recovery uses an embedded helper in protected Program Files.
+# No external script is installed or executed by the recovery task.
+if(!$DrexRecoveryOnly){
+ $safeDir=Join-Path $env:ProgramFiles 'DrexDownloads-Recovery'
+ [IO.Directory]::CreateDirectory($safeDir)|Out-Null
+ if((Get-Item $safeDir).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Unsafe recovery directory'}
+ $safeExe=Join-Path $safeDir 'DrexDownloadsRecovery.exe'
+ if((Test-Path $safeExe) -and ((Get-Item $safeExe).Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Unsafe recovery executable'}
+ $source=Join-Path $root 'DrexDownloads.exe'
+ if(!(Test-Path $safeExe) -or (Get-FileHash $source).Hash -ne (Get-FileHash $safeExe).Hash){Copy-Item -LiteralPath $source -Destination $safeExe -Force}
+ $encodedRoot=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($root))
+ $action=New-ScheduledTaskAction -Execute $safeExe -Argument ('--network-recover '+$encodedRoot)
+ $settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 3) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+ Register-ScheduledTask -TaskName 'Drex Downloads - Integrated Recovery' -Action $action -Settings $settings -Trigger (New-ScheduledTaskTrigger -AtStartup) -User 'SYSTEM' -RunLevel Highest -Force | Out-Null
+}
 $mutex=New-Object Threading.Mutex($false,'Global\DrexDownloadsFirewallGuard')
 if(!$mutex.WaitOne(0)){exit}
 $policy=New-Object -ComObject HNetCfg.FwPolicy2
@@ -19,11 +47,11 @@ function Restore {
  }
  Status 'Normal'
 }
-function Allow($name,$program,$service,$protocol=256,$ports='',$direction=2){
+function Allow($name,$program,$service,$protocol=256,$ports='',$direction=2,$remote=''){
  $r=New-Object -ComObject HNetCfg.FWRule
  $r.Name='Drex Exclusive - '+$name;$r.Grouping=$group;$r.Direction=$direction;$r.Action=1;$r.Enabled=$true;$r.Profiles=7
  if($program){$r.ApplicationName=$program};if($service){$r.ServiceName=$service}
- $r.Protocol=$protocol;if($ports){$r.RemotePorts=$ports};$policy.Rules.Add($r)
+ if($remote){$r.RemoteAddresses=$remote};$r.Protocol=$protocol;if($ports){$r.RemotePorts=$ports};$policy.Rules.Add($r)
 }
 function OptionalPrograms {
  # Missing optional software is normal on a portable installation.
@@ -47,6 +75,11 @@ function Activate {
  $netProfiles=@(Get-NetFirewallProfile | Select-Object Name,@{n='DefaultOutboundAction';e={$_.DefaultOutboundAction.ToString()}})
  $json=@{profiles=$profiles;allowed=$allowed;netProfiles=$netProfiles}|ConvertTo-Json -Depth 5
  $bytes=[Text.Encoding]::UTF8.GetBytes($json);$f=[IO.File]::Open($state,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read);try{$f.Write($bytes,0,$bytes.Length);$f.Flush($true)}finally{$f.Dispose()}
+ # LAN remains available to every program, including new processes and RDP.
+ Allow 'LAN local subnet' '' '' 256 '' 2 'LocalSubnet'
+ Allow 'LAN private IPv4' '' '' 256 '' 2 '10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16'
+ Allow 'LAN private IPv6' '' '' 256 '' 2 'fc00::/7,fe80::/10'
+ Allow 'LAN discovery' '' '' 256 '' 2 '224.0.0.0/24,ff02::/16'
  Allow 'Downloader' (Join-Path $root 'DrexDownloads.exe') ''
  foreach($optional in @(OptionalPrograms)){Allow $optional.Name $optional.Path ''}
  Allow 'DNS UDP' "$env:WINDIR\System32\svchost.exe" 'Dnscache' 17 '53'
@@ -56,17 +89,20 @@ function Activate {
  foreach($p in $profiles){if(!$p.enabled){$r=New-Object -ComObject HNetCfg.FWRule;$r.Name='Drex Exclusive - Preserve inbound '+$p.id;$r.Grouping=$group;$r.Direction=1;$r.Action=1;$r.Enabled=$true;$r.Profiles=$p.id;$policy.Rules.Add($r)}}
  foreach($r in @($policy.Rules)){if($r.Enabled -and $r.Direction -eq 2 -and $r.Action -eq 1 -and $r.Grouping -ne $group){$r.Enabled=$false}}
  foreach($id in 1,2,4){$policy.DefaultOutboundAction($id)=0;$policy.FirewallEnabled($id)=$true}
- Status 'Exclusivo: descargador + excepciones disponibles'
+ Status 'Exclusivo: Internet limitado; LAN libre'
 }
 try {
  Restore
+ if($DrexRecoveryOnly){exit}
+ [IO.File]::WriteAllText((Join-Path $runtime 'integrated.version'),'1.0.6')
  while($true){
   try {
    $active=$false
+   if(!(Test-Path $lease) -or ((Get-Date).ToUniversalTime()-(Get-Item $lease).LastWriteTimeUtc).TotalSeconds -gt 20){Restore;break}
    if(Test-Path $lease){$info=Get-Item $lease;if(((Get-Date).ToUniversalTime()-$info.LastWriteTimeUtc).TotalSeconds -lt 15){$j=Get-Content -Raw $lease|ConvertFrom-Json;$active=$j.enabled -and $j.active}}
    if($active){if(!(Test-Path $state)){Activate}}elseif(Test-Path $state){Restore}
-  }catch{$err=$_;try{Restore}catch{};[IO.File]::WriteAllText((Join-Path $PSScriptRoot 'error.txt'),$err.ToString()+' '+$err.InvocationInfo.PositionMessage);Status ('Error: '+$err.Exception.Message);Start-Sleep -Seconds 10}
+  }catch{$err=$_;try{Restore}catch{};[IO.File]::WriteAllText((Join-Path $runtime 'error.txt'),$err.ToString()+' '+$err.InvocationInfo.PositionMessage);Status ('Error: '+$err.Exception.Message);Start-Sleep -Seconds 10}
   if(Test-Path $status){[IO.File]::SetLastWriteTimeUtc($status,[DateTime]::UtcNow)}
   Start-Sleep -Seconds 2
  }
-}finally{try{Restore}catch{};$mutex.ReleaseMutex();$mutex.Dispose()}
+}finally{try{Restore}catch{};Remove-Item (Join-Path $runtime 'integrated.version') -ErrorAction SilentlyContinue;$mutex.ReleaseMutex();$mutex.Dispose()}

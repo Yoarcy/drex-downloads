@@ -1,23 +1,21 @@
-# Internet exclusivo — componente opcional experimental
+# Internet exclusivo integrado · 1.0.6
 
-La aplicación escribe un heartbeat local. Un supervisor PowerShell instalado como tarea de Windows aplica reglas de firewall; no invoca IA ni consume créditos de Drex.
+El componente está incrustado en DrexDownloads.exe. No requiere scripts externos, OpenClaw, IA ni instalación aparte. Al marcar Internet exclusivo, Windows puede solicitar permiso de administrador. Si se cancela, el modo no se activa y las descargas normales siguen disponibles.
 
-## Instalación
+## LAN preservada
 
-Desde PowerShell **como administrador**, en la carpeta instalada, ejecuta `network/install.ps1` conforme a la política de scripts de tu equipo. Registra la tarea `Drex Downloads - Network Guard` con cuenta SYSTEM al inicio de Windows. El script actual configura la ejecución del supervisor con `-ExecutionPolicy Bypass` para ese proceso; no cambia la política global.
+Las reglas permiten salida para todas las aplicaciones a LocalSubnet, redes privadas IPv4 10/8, 172.16/12 y 192.168/16, link-local IPv4/IPv6, ULA IPv6 y multicast de descubrimiento local. Esto incluye procesos nuevos, RDP y SMB. Redes enrutadas con direcciones públicas fuera de LocalSubnet no se clasifican automáticamente como LAN. Se conservan los bloqueos preexistentes: no se anulan restricciones impuestas por el administrador. Un proxy en la LAN podría dar acceso a Internet; el modo no es una frontera de seguridad.
 
-Activa «Internet exclusivo» en la aplicación. Si no existe el supervisor se informa que no está disponible; el descargador normal sigue siendo independiente.
+La salida a Internet queda limitada al descargador y las excepciones disponibles (Chrome, DNS/DHCP y transporte WSL). WSL/System es una excepción amplia: no hay aislamiento por proceso Linux. No garantiza aumentar la velocidad.
 
-## Comportamiento
+## Ciclo de vida y recuperación
 
-Bloqueo de salida por defecto, descargador permitido, Chrome si está en las rutas estándar, DNS/DHCP y transporte WSL si se detecta activo. No requiere OpenClaw instalado. Los procesos nuevos también están sujetos a la política de salida; no es una barrera frente a administradores o software que cambie las reglas.
+Un auxiliar elevado ejecuta el supervisor incluido en el recurso del ejecutable; no lee código PowerShell de archivos de la instalación. La app envía heartbeat cada segundo. Al desmarcar, pausar todas o terminar se restaura el snapshot. Si deja de llegar heartbeat, se restaura; el auxiliar termina tras unos 20 segundos sin heartbeat. Los intervalos no son garantías de tiempo real.
 
-La excepción WSL/System es amplia y no aísla un proceso Linux concreto. No es una herramienta de seguridad certificada ni garantiza aumentar la velocidad. La detección de Chrome no cubre todas las instalaciones por usuario.
+El propio programa crea automáticamente un auxiliar de recuperación en Program Files/DrexDownloads-Recovery y la tarea de arranque `Drex Downloads - Integrated Recovery` (SYSTEM), para restaurar la configuración tras reinicio sin depender de que el usuario abra la app. No se activa Internet exclusivo al arrancar Windows: la tarea solo restaura. La tarea antigua del supervisor se retira automáticamente si pertenece a esta instalación y está inactiva.
 
-El supervisor guarda snapshot y desactiva temporalmente reglas de permiso de salida. Restaura al pausar todas las descargas, terminar, desmarcar el modo o caducar el heartbeat. El umbral de heartbeat es 15 segundos más el tiempo de comprobación/aplicación. No elimines `network/snapshot.json` mientras exista una restricción activa.
+No borres `network/snapshot.json` mientras exista una restricción. Desactiva el modo y espera Normal antes de mover o desinstalar. Mantén la carpeta original accesible para recuperar el snapshot. No hay desinstalador automatizado en esta versión. Si deseas retirar completamente la recuperación, con el modo en Normal un administrador puede quitar la tarea y su carpeta protegida.
 
-## Precauciones operativas
+## Validación
 
-Desmarca el modo y espera estado Normal antes de mover o desinstalar. Instala en una ruta con permisos adecuados: el supervisor corre como SYSTEM y sus scripts no deben quedar modificables por usuarios no confiables. No desplegar sin revisión adicional en equipos multiusuario o administrados. No se ha realizado auditoría independiente.
-
-Pruebas anteriores comprobaron bloqueo/restauración y continuidad de descarga. La revisión de detección opcional tiene sintaxis validada; sus cinco casos simulados aún requieren ejecución. No se ha probado un apagón físico ni una segunda PC completa.
+Cinco pruebas simuladas de portabilidad aprobadas. Prueba real con modo activo: TCP LAN 3389 (RDP) y 445 (SMB) accesibles, PowerShell bloqueado al acceder a HTTPS público y descarga progresando. Al desactivar: estado Normal, snapshot retirado y HTTPS200. No se probó un apagón físico ni la instalación completa en otra PC.

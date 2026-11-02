@@ -16,7 +16,7 @@ Produce `DrexDownloads.exe` con el icono de `assets/`. Si la política de ejecuc
 .\src\package.ps1
 ```
 
-Compila la app, crea un payload limpio, compila el instalador y genera ZIP y SHA256SUMS en `dist/`. No recoge carpetas de datos, parciales o backups. El instalador exige destino vacío y no activa el supervisor de red.
+Compila la app con network/guard.ps1 como recurso incrustado, crea un payload limpio, compila el instalador y genera ZIP y SHA256SUMS en `dist/`. No recoge carpetas de datos, parciales o backups. El instalador exige destino vacío y no activa el modo exclusivo. El ejecutable prepara automáticamente su auxiliar al activar el modo.
 
 ## Pruebas del motor
 

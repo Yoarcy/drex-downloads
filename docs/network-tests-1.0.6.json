@@ -1,0 +1,12 @@
+{
+  "version": "1.0.6",
+  "optional_software_cases_passed": 5,
+  "lan_tcp_3389": "passed with mode active",
+  "lan_tcp_445": "passed with mode active",
+  "public_https_non_allowlisted": "blocked with mode active",
+  "public_https_restored": "HTTP200 after disabling",
+  "snapshot_restored": true,
+  "download_progress": "observed",
+  "physical_power_cut_test": false,
+  "second_pc_install_test": false
+}
